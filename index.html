@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Controle de Xerox / Impressão</title>
+<!-- jsPDF + autotable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#fff; --accent:#1167b1; --muted:#666; --danger:#d9534f;
+  }
+  body{font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:var(--bg);margin:0;padding:20px;color:#111;}
+  h1{margin:0 0 10px;font-size:20px;color:var(--accent)}
+  .container{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:18px;}
+  .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;}
+  input[type="text"],input[type="number"],input[type="date"],select{width:100%;padding:8px;border-radius:6px;border:1px solid #e0e6ef;margin-bottom:10px;box-sizing:border-box;}
+  .row{display:flex;gap:8px;}
+  .btn{display:inline-block;padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;}
+  .btn.secondary{background:#e6eef9;color:var(--accent);border:1px solid #c6daf5;}
+  .btn.danger{background:var(--danger);color:#fff;}
+  .service-buttons{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .service-btn{padding:10px;border-radius:8px;border:1px solid #e0e6ef;background:#fff;cursor:pointer;min-width:120px;text-align:center;}
+  .service-btn.active{border-color:var(--accent);box-shadow:0 2px 6px rgba(17,103,177,0.12);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:8px;border-bottom:1px solid #f0f2f6;text-align:left;}
+  th{background:#fbfdff;color:var(--muted);font-weight:600;}
+  .small{font-size:12px;color:var(--muted)}
+  .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .totals{margin-top:10px;font-weight:600;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .right{display:flex;gap:8px;justify-content:flex-end;align-items:center;}
+  .muted{color:var(--muted);font-size:13px;}
+  .sm-btn{padding:6px 8px;border-radius:6px;border:1px solid #e0e6ef;background:#fff;cursor:pointer;}
+  .tiny{font-size:12px;padding:6px 8px;border-radius:6px;}
+  .footer-note{font-size:12px;color:var(--muted);margin-top:8px;}
+  @media (max-width:980px){.container{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+  <h1>Controle de Xerox / Impressão</h1>
+  <div class="container">
+    <!-- Form + History controls -->
+    <div class="card">
+      <h2 style="font-size:16px;margin-bottom:8px">Registrar Venda</h2>
+      <div>
+        <label>Cliente (opcional) — deixe em branco = <span class="small">Sem Cliente</span></label>
+        <input id="inputCliente" type="text" placeholder="Nome do cliente (opcional)" />
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="flex:1">
+          <label>Quantidade</label>
+          <input id="inputQuantidade" type="number" min="1" value="1" />
+        </div>
+        <div style="width:170px">
+          <label>Preço unitário (R$)</label>
+          <input id="inputPrecoUnit" type="number" min="0" step="0.01" value="2.00" />
+        </div>
+      </div>
+
+      <label>Serviço</label>
+      <div class="service-buttons" id="serviceButtons">
+        <!-- Buttons gerados via JS -->
+      </div>
+
+      <div class="row" style="align-items:center;">
+        <button id="btnAdd" class="btn">Adicionar Venda</button>
+        <button id="btnClearForm" class="btn secondary">Limpar</button>
+        <div style="margin-left:auto" class="muted">Data/hora será registrada automaticamente</div>
+      </div>
+
+      <hr style="margin:12px 0">
+
+      <h3 style="font-size:15px;margin:6px 0">Preços base</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="flex:1">
+          <label>Impressão (R$ 2,00)</label>
+          <input class="price-base" data-key="imp2" type="number" step="0.01" min="0" id="price_imp2" />
+        </div>
+        <div style="flex:1">
+          <label>Impressão (R$ 1,00)</label>
+          <input class="price-base" data-key="imp1" type="number" step="0.01" min="0" id="price_imp1" />
+        </div>
+        <div style="flex:1">
+          <label>Xerox (R$ 0,50)</label>
+          <input class="price-base" data-key="xerox" type="number" step="0.01" min="0" id="price_xerox" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+        <button id="btnSaveBasePrices" class="btn">Salvar preços base</button>
+        <button id="btnResetBasePrices" class="btn secondary">Resetar para padrão</button>
+        <div class="footer-note">Altere os preços-base se quiser dar desconto ou aumentar temporariamente.</div>
+      </div>
+    </div>
+
+    <!-- Right column: filtros + histórico -->
+    <div class="card">
+      <h2 style="font-size:16px;margin-bottom:8px">Histórico & Relatórios</h2>
+
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:end;">
+        <div style="flex:1">
+          <label>Filtro: Cliente</label>
+          <select id="filterCliente"><option value="__all">Todos</option><option value="__sem">Sem Cliente</option></select>
+        </div>
+        <div style="width:140px">
+          <label>Data início</label>
+          <input id="filterStart" type="date" />
+        </div>
+        <div style="width:140px">
+          <label>Data fim</label>
+          <input id="filterEnd" type="date" />
+        </div>
+      </div>
+
+      <div class="controls" style="margin-bottom:8px;">
+        <button id="btnFilter" class="btn">Aplicar Filtro</button>
+        <button id="btnResetFilter" class="btn secondary">Limpar Filtro</button>
+        <button id="btnExportPDF" class="btn" style="margin-left:auto">Exportar filtrado → PDF</button>
+      </div>
+
+      <div style="max-height:420px;overflow:auto;">
+        <table id="tableHistorico">
+          <thead>
+            <tr>
+              <th>Data / Hora</th>
+              <th>Cliente</th>
+              <th>Serviço</th>
+              <th>Preço R$</th>
+              <th>Quantidade</th>
+              <th>Total R$</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="totals" id="totaisView">Totais: 0 itens — R$ 0,00</div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="btnClearHistory" class="btn danger">Limpar todo histórico</button>
+        <button id="btnExportCSV" class="btn secondary">Exportar CSV</button>
+      </div>
+      <div class="footer-note">Dados salvos localmente no seu navegador (localStorage). Para manter histórico, não limpe os dados do navegador.</div>
+    </div>
+  </div>
+
+<script>
+/*
+  Controle de Xerox / Impressão - single-file
+  - Salva histórico em localStorage
+  - Preços base editáveis
+  - Filtragem por cliente e período
+  - Exporta PDF com jsPDF + autotable (linhas + total)
+*/
+
+// --- Configurações e helpers ---
+const LS_KEY = 'xerox_history_v1';
+const LS_PRICES = 'xerox_prices_v1';
+const defaultPrices = { imp2: 2.00, imp1: 1.00, xerox: 0.50 };
+
+function moneyBR(value){
+  return value.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function nowISO(){
+  return new Date().toISOString();
+}
+function formatDateTime(iso){
+  const d = new Date(iso);
+  return d.toLocaleString('pt-BR');
+}
+function dateOnlyISO(iso){
+  // YYYY-MM-DD
+  const d = new Date(iso);
+  const year = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${year}-${mm}-${dd}`;
+}
+
+// --- State ---
+let history = [];
+let prices = loadPrices();
+
+// --- DOM refs ---
+const inputCliente = document.getElementById('inputCliente');
+const inputQuantidade = document.getElementById('inputQuantidade');
+const inputPrecoUnit = document.getElementById('inputPrecoUnit');
+const serviceButtonsDiv = document.getElementById('serviceButtons');
+const tableBody = document.querySelector('#tableHistorico tbody');
+const filterCliente = document.getElementById('filterCliente');
+const filterStart = document.getElementById('filterStart');
+const filterEnd = document.getElementById('filterEnd');
+const totaisView = document.getElementById('totaisView');
+
+// Price inputs
+document.getElementById('price_imp2').value = prices.imp2.toFixed(2);
+document.getElementById('price_imp1').value = prices.imp1.toFixed(2);
+document.getElementById('price_xerox').value = prices.xerox.toFixed(2);
+
+// --- Initialize service buttons ---
+const services = [
+  { key:'imp2', label:'Impressão R$ 2,00', desc:'Impressão (2,00)' },
+  { key:'imp1', label:'Impressão R$ 1,00', desc:'Impressão (1,00)' },
+  { key:'xerox', label:'Xerox R$ 0,50',  desc:'Xerox (0,50)' }
+];
+
+let activeService = services[0].key;
+
+function buildServiceButtons(){
+  serviceButtonsDiv.innerHTML = '';
+  services.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'service-btn';
+    if(s.key === activeService) btn.classList.add('active');
+    btn.innerHTML = `<div style="font-weight:600">${s.label}</div><div class="small">${s.desc}</div>`;
+    btn.onclick = () => {
+      activeService = s.key;
+      document.querySelectorAll('.service-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      inputPrecoUnit.value = prices[s.key].toFixed(2);
+    };
+    serviceButtonsDiv.appendChild(btn);
+  });
+}
+buildServiceButtons();
+inputPrecoUnit.value = prices[activeService].toFixed(2);
+
+// --- Load / Save ---
+function saveHistory(){
+  localStorage.setItem(LS_KEY, JSON.stringify(history));
+}
+function loadHistory(){
+  const raw = localStorage.getItem(LS_KEY);
+  if(raw){
+    try{
+      history = JSON.parse(raw);
+    }catch(e){
+      history = [];
+    }
+  } else history = [];
+}
+function savePrices(){
+  localStorage.setItem(LS_PRICES, JSON.stringify(prices));
+}
+function loadPrices(){
+  const raw = localStorage.getItem(LS_PRICES);
+  if(raw){
+    try { return JSON.parse(raw); } catch(e){}
+  }
+  return {...defaultPrices};
+}
+
+// --- UI actions ---
+document.getElementById('btnAdd').addEventListener('click', () => {
+  const cliente = inputCliente.value.trim() || '__sem';
+  const quantidade = Number(inputQuantidade.value) || 1;
+  const preco = Number(parseFloat(inputPrecoUnit.value || 0).toFixed(2));
+  if(quantidade <= 0 || preco < 0){
+    alert('Quantidade deve ser >=1 e preço válido.');
+    return;
+  }
+  const serv = services.find(s=>s.key === activeService) || services[0];
+  const item = {
+    id: 'id'+Date.now(),
+    timestamp: nowISO(),
+    cliente: cliente,
+    servicoKey: serv.key,
+    servicoLabel: serv.label,
+    precoUnit: preco,
+    quantidade: quantidade,
+    total: Number((preco * quantidade).toFixed(2))
+  };
+  history.unshift(item); // inserir no topo
+  saveHistory();
+  refreshUI();
+  // limpar parcialmente
+  inputQuantidade.value = 1;
+  // não limpar cliente para facilitar múltiplas vendas
+});
+
+document.getElementById('btnClearForm').addEventListener('click', () => {
+  inputCliente.value = '';
+  inputQuantidade.value = 1;
+  inputPrecoUnit.value = prices[activeService].toFixed(2);
+});
+
+// Save base prices
+document.getElementById('btnSaveBasePrices').addEventListener('click', () => {
+  const p_imp2 = parseFloat(document.getElementById('price_imp2').value || 0);
+  const p_imp1 = parseFloat(document.getElementById('price_imp1').value || 0);
+  const p_xerox = parseFloat(document.getElementById('price_xerox').value || 0);
+  if(p_imp2 < 0 || p_imp1 < 0 || p_xerox < 0){
+    alert('Preços devem ser >= 0');
+    return;
+  }
+  prices.imp2 = Number(p_imp2.toFixed(2));
+  prices.imp1 = Number(p_imp1.toFixed(2));
+  prices.xerox = Number(p_xerox.toFixed(2));
+  savePrices();
+  inputPrecoUnit.value = prices[activeService].toFixed(2);
+  buildServiceButtons();
+  alert('Preços salvos!');
+});
+
+// Reset base prices
+document.getElementById('btnResetBasePrices').addEventListener('click', () => {
+  prices = {...defaultPrices};
+  savePrices();
+  document.getElementById('price_imp2').value = prices.imp2.toFixed(2);
+  document.getElementById('price_imp1').value = prices.imp1.toFixed(2);
+  document.getElementById('price_xerox').value = prices.xerox.toFixed(2);
+  inputPrecoUnit.value = prices[activeService].toFixed(2);
+  buildServiceButtons();
+});
+
+// Filter / Export
+document.getElementById('btnFilter').addEventListener('click', refreshUI);
+document.getElementById('btnResetFilter').addEventListener('click', () => {
+  filterCliente.value = '__all';
+  filterStart.value = '';
+  filterEnd.value = '';
+  refreshUI();
+});
+
+// Clear history
+document.getElementById('btnClearHistory').addEventListener('click', () => {
+  if(confirm('Deseja limpar todo o histórico? Essa ação é irreversível.')) {
+    history = [];
+    saveHistory();
+    refreshUI();
+  }
+});
+
+// Export CSV simple
+document.getElementById('btnExportCSV').addEventListener('click', () => {
+  const filtered = applyFilters();
+  if(filtered.length === 0){ alert('Nenhum registro para exportar.'); return; }
+  const headers = ['DataHora','Cliente','Servico','PrecoUnit','Quantidade','Total'];
+  const rows = filtered.map(r => [
+    r.timestamp,
+    r.cliente === '__sem' ? 'Sem Cliente' : r.cliente,
+    r.servicoLabel,
+    r.precoUnit.toFixed(2),
+    r.quantidade,
+    r.total.toFixed(2)
+  ]);
+  const csv = [headers.join(';'), ...rows.map(r=>r.join(';'))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `histórico_xerox_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Export PDF using jsPDF & autotable
+document.getElementById('btnExportPDF').addEventListener('click', async () => {
+  const filtered = applyFilters();
+  if(filtered.length === 0){ alert('Nenhum registro para exportar.'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
+  const marginLeft = 40;
+  const maxWidth = 520;
+
+  const title = 'Histórico de Vendas - Controle Xerox';
+  doc.setFontSize(14);
+  doc.text(title, marginLeft, 40);
+  const filtroClienteText = filterCliente.value === '__all' ? 'Todos' : (filterCliente.value === '__sem' ? 'Sem Cliente' : filterCliente.value);
+  const periodoText = `${filterStart.value || '---'} até ${filterEnd.value || '---'}`;
+  doc.setFontSize(10);
+  doc.text(`Cliente: ${filtroClienteText}`, marginLeft, 60);
+  doc.text(`Período: ${periodoText}`, marginLeft, 76);
+  doc.text(`Exportado em: ${formatDateTime(nowISO())}`, marginLeft, 92);
+
+  // Prepare table rows
+  const rows = filtered.map(r => ([
+    formatDateTime(r.timestamp),
+    (r.cliente === '__sem' ? 'Sem Cliente' : r.cliente),
+    r.servicoLabel.replace(/\s+\d+,\d+|R\$\s*\d+(\,\d+)?/g,'').trim(),
+    r.precoUnit.toFixed(2),
+    r.quantidade,
+    r.total.toFixed(2)
+  ]));
+
+  // AutoTable
+  doc.autoTable({
+    head: [['Data / Hora','Cliente','Serviço','Preço R$','Qtd','Total R$']],
+    body: rows,
+    startY: 110,
+    styles: {fontSize:9},
+    headStyles: {fillColor: [22,103,177], textColor:255},
+    margin: {left: marginLeft, right: marginLeft}
+  });
+
+  // Totais
+  const totalGeral = filtered.reduce((s,x)=>s + x.total, 0);
+  const finalY = doc.previousAutoTable ? doc.previousAutoTable.finalY + 20 : 110 + rows.length * 10;
+  doc.setFontSize(11);
+  doc.text(`Total geral: R$ ${moneyBR(totalGeral)}`, marginLeft, finalY);
+
+  // Save
+  const filename = `histórico_xerox_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+});
+
+// --- Table refresh ---
+function refreshUI(){
+  loadHistory();
+  populateClientFilter();
+  renderTable();
+  updateTotals();
+}
+
+// Fill client dropdown
+function populateClientFilter(){
+  const clients = new Set(history.map(h => h.cliente));
+  const current = filterCliente.value || '__all';
+  filterCliente.innerHTML = '<option value="__all">Todos</option><option value="__sem">Sem Cliente</option>';
+  Array.from(clients).filter(c=>c && c !== '__sem').sort().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    filterCliente.appendChild(opt);
+  });
+  if(Array.from(filterCliente.options).some(o=>o.value === current)){
+    filterCliente.value = current;
+  } else filterCliente.value = '__all';
+}
+
+// Apply filters and return filtered array
+function applyFilters(){
+  let result = [...history];
+  const cli = filterCliente.value || '__all';
+  if(cli === '__sem'){
+    result = result.filter(r => r.cliente === '__sem');
+  } else if(cli !== '__all'){
+    result = result.filter(r => r.cliente.toLowerCase() === cli.toLowerCase());
+  }
+  // date range inclusive
+  if(filterStart.value){
+    const startDate = new Date(filterStart.value + 'T00:00:00');
+    result = result.filter(r => new Date(r.timestamp) >= startDate);
+  }
+  if(filterEnd.value){
+    const endDate = new Date(filterEnd.value + 'T23:59:59');
+    result = result.filter(r => new Date(r.timestamp) <= endDate);
+  }
+  return result;
+}
+
+function renderTable(){
+  const rows = applyFilters();
+  tableBody.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDateTime(r.timestamp)}</td>
+      <td>${r.cliente === '__sem' ? '<i>Sem Cliente</i>' : escapeHtml(r.cliente)}</td>
+      <td>${escapeHtml(r.servicoLabel)}</td>
+      <td style="white-space:nowrap">R$ ${moneyBR(r.precoUnit)}</td>
+      <td>${r.quantidade}</td>
+      <td style="font-weight:600">R$ ${moneyBR(r.total)}</td>
+      <td>
+        <button class="sm-btn" data-id="${r.id}" onclick="deleteEntry(this.dataset.id)">Excluir</button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
+// delete item by id
+window.deleteEntry = function(id){
+  if(!confirm('Excluir este registro?')) return;
+  history = history.filter(x=>x.id !== id);
+  saveHistory();
+  refreshUI();
+};
+
+// totals
+function updateTotals(){
+  const rows = applyFilters();
+  const totalGeral = rows.reduce((s,r)=>s + r.total, 0);
+  const totalItems = rows.reduce((s,r)=>s + r.quantidade, 0);
+  totaisView.textContent = `Registros: ${rows.length} — Quantidade total: ${totalItems} — Total R$: ${moneyBR(totalGeral)}`;
+}
+
+// util escape
+function escapeHtml(text){
+  if(!text) return '';
+  return text.replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
+}
+
+// Init load
+loadHistory();
+refreshUI();
+
+// Set inputPrecoUnit when clicking base price inputs focus out
+document.querySelectorAll('.price-base').forEach(inp => {
+  inp.addEventListener('change', () => {
+    // sync preview input
+    const key = inp.dataset.key;
+    if(key && prices[key] !== undefined){
+      prices[key] = Number(parseFloat(inp.value || 0).toFixed(2));
+      savePrices();
+      buildServiceButtons();
+    }
+    inputPrecoUnit.value = prices[activeService].toFixed(2);
+  });
+});
+
+// When page loads, ensure price inputs reflect stored prices
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('price_imp2').value = prices.imp2.toFixed(2);
+  document.getElementById('price_imp1').value = prices.imp1.toFixed(2);
+  document.getElementById('price_xerox').value = prices.xerox.toFixed(2);
+});
+
+// Optional: persist changes to inputPrecoUnit when service changed
+// (already handled by service button click)
+
+// Initialize filter dates as empty
+filterStart.value = '';
+filterEnd.value = '';
+
+</script>
+</body>
+</html>
