@@ -1,6 +1,14 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
+  <link rel="manifest" href="manifest.json">
+<link rel="icon" href="https://static.vecteezy.com/system/resources/thumbnails/000/064/426/small_2x/vector-xerox-logo-graphics.jpg">
+<link rel="apple-touch-icon" href="https://static.vecteezy.com/system/resources/thumbnails/000/064/426/small_2x/vector-xerox-logo-graphics.jpg">
+<meta name="theme-color" content="#1e90ff">
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <title>Player</title>
+ <style>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Controle de Xerox / Impressão</title>
@@ -528,6 +536,34 @@ document.addEventListener('DOMContentLoaded', () => {
 filterStart.value = '';
 filterEnd.value = '';
 
+</script>
+  <button id="btnInstall" style="display:none;">📲 Instalar App</button>
+<script>
+let deferredPrompt;
+const btnInstall = document.getElementById("btnInstall");
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  btnInstall.style.display = "block";
+});
+
+btnInstall.addEventListener("click", async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log("Resultado da instalação:", outcome);
+    deferredPrompt = null;
+    btnInstall.style.display = "none";
+  }
+});
+
+// Registrar Service Worker
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js")
+    .then(() => console.log("SW registrado"))
+    .catch(err => console.error("Erro SW:", err));
+}
 </script>
 </body>
 </html>
